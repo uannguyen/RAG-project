@@ -17,7 +17,11 @@ def ask(question: str) -> dict:
     Hỏi một câu và nhận câu trả lời từ tài liệu.
     Trả về dict gồm answer và sources.
     """
-    top_k = int(os.getenv("TOP_K", 5))
+    # FIXED: safe int parsing with fallback to prevent ValueError crash
+    try:
+        top_k = int(os.getenv("TOP_K", 5))
+    except ValueError:
+        top_k = 5
 
     # 1. Embed câu hỏi
     query_vector = embed_query(question)
@@ -40,5 +44,4 @@ def ask(question: str) -> dict:
     return {
         "answer": answer,
         "sources": sources,
-        "chunks": chunks,
-    }
+    }  # FIXED: removed unused "chunks" key not in response model

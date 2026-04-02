@@ -19,8 +19,15 @@ def ingest_directory(dir_path: str, batch_size: int = 32):
     store = VectorStore()
     store.ensure_collection()
 
-    chunk_size = int(os.getenv("CHUNK_SIZE", 512))
-    chunk_overlap = int(os.getenv("CHUNK_OVERLAP", 50))
+    # FIXED: safe int parsing with fallback to prevent ValueError crash
+    try:
+        chunk_size = int(os.getenv("CHUNK_SIZE", 512))
+    except ValueError:
+        chunk_size = 512
+    try:
+        chunk_overlap = int(os.getenv("CHUNK_OVERLAP", 50))
+    except ValueError:
+        chunk_overlap = 50
 
     total_chunks = 0
     print(f"[INFO] Đang load documents từ: {dir_path}")
@@ -47,8 +54,15 @@ def ingest_file(file_path: str, batch_size: int = 8):
     store = VectorStore()
     store.ensure_collection()
 
-    chunk_size = int(os.getenv("CHUNK_SIZE", 512))
-    chunk_overlap = int(os.getenv("CHUNK_OVERLAP", 50))
+    # FIXED: safe int parsing with fallback to prevent ValueError crash
+    try:
+        chunk_size = int(os.getenv("CHUNK_SIZE", 512))
+    except ValueError:
+        chunk_size = 512
+    try:
+        chunk_overlap = int(os.getenv("CHUNK_OVERLAP", 50))
+    except ValueError:
+        chunk_overlap = 50
 
     doc = load_file(file_path)
     chunks = chunk_document(doc, chunk_size, chunk_overlap)

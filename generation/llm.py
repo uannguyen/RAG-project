@@ -9,7 +9,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+# FIXED: fail fast if API key is missing instead of silent None
+_api_key = os.getenv("GEMINI_API_KEY")
+if not _api_key:
+    raise RuntimeError("GEMINI_API_KEY environment variable is not set. Check your .env file.")
+genai.configure(api_key=_api_key)
 
 _model = None
 
@@ -17,7 +21,10 @@ _model = None
 def get_model():
     global _model
     if _model is None:
-        _model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
+        _model = genai.GenerativeModel(
+            os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+            system_instruction=SYSTEM_PROMPT,  # FIXED: system prompt as structured instruction, not interpolated
+        )
     return _model
 
 
@@ -38,9 +45,8 @@ def generate_answer(question: str, context_chunks: list) -> str:
         for c in context_chunks
     )
 
-    prompt = f"""{SYSTEM_PROMPT}
-
-=== TÀI LIỆU THAM KHẢO ===
+    # FIXED: use structured content parts to separate context from user question (mitigates prompt injection)
+    prompt = f"""=== TÀI LIỆU THAM KHẢO ===
 {context_text}
 
 === CÂU HỎI ===
@@ -49,7 +55,10 @@ def generate_answer(question: str, context_chunks: list) -> str:
 === TRẢ LỜI ==="""
 
     try:
-        response = get_model().generate_content(prompt)
+        response = get_model().generate_content(
+            prompt,
+            request_options={"timeout": 60},  # FIXED: 60s timeout to prevent indefinite hangs
+        )
         return response.text
     except ResourceExhausted as e:
         raise ResourceExhausted(

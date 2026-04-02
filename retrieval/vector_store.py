@@ -4,6 +4,8 @@ vector_store.py — Thao tác với Qdrant: tạo collection, upsert, search.
 
 import os
 import uuid
+import hashlib
+import threading
 from typing import List, Dict, Any
 
 from qdrant_client import QdrantClient
@@ -18,14 +20,17 @@ from qdrant_client.models import (
 
 VECTOR_SIZE = 3072  # Google gemini-embedding-001 output size
 
-# Singleton client — tránh tạo connection pool mới mỗi lần gọi
+# FIXED: thread-safe singleton with lock
 _client = None
+_client_lock = threading.Lock()
 
 
 def _get_client() -> QdrantClient:
     global _client
     if _client is None:
-        _client = QdrantClient(url=os.getenv("QDRANT_URL", "http://localhost:6333"))
+        with _client_lock:
+            if _client is None:  # FIXED: double-checked locking
+                _client = QdrantClient(url=os.getenv("QDRANT_URL", "http://localhost:6333"))
     return _client
 
 
@@ -48,7 +53,8 @@ class VectorStore:
         """Lưu chunks + vectors vào Qdrant."""
         points = [
             PointStruct(
-                id=str(uuid.uuid4()),
+                # FIXED: deterministic ID from source+chunk_index to prevent duplicates on re-ingest
+                id=self._make_point_id(chunk),
                 vector=vec,
                 payload={
                     "content": chunk["content"],
@@ -58,6 +64,13 @@ class VectorStore:
             for chunk, vec in zip(chunks, vectors)
         ]
         self.client.upsert(collection_name=self.collection, points=points)
+
+    @staticmethod
+    def _make_point_id(chunk: Dict) -> str:
+        """Generate a deterministic UUID from source filename + chunk index."""
+        meta = chunk.get("metadata", {})
+        key = f"{meta.get('source', '')}_chunk_{meta.get('chunk_index', '')}"
+        return str(uuid.UUID(hashlib.md5(key.encode()).hexdigest()))
 
     def search(self, query_vector: List[float], top_k: int = 5) -> List[Dict[str, Any]]:
         """Tìm top_k chunks gần nhất với query vector."""

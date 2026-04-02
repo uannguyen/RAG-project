@@ -25,7 +25,7 @@ def load_docx(file_path: str) -> str:
 
 
 def load_txt(file_path: str) -> str:
-    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+    with open(file_path, "r", encoding="utf-8", errors="replace") as f:  # FIXED: "replace" instead of "ignore" to avoid silent data loss
         return f.read()
 
 
